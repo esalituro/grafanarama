@@ -18,3 +18,5 @@ dist/
 .pytest_cache/
 *.db
 *.json.bak
+.env
+.env.local

@@ -27,7 +27,19 @@ class GrafanaClient(object):
             "Accept": "application/json",
         }
         if self._apiKey:
-            self.headers["Authorization"] = f"Bearer {self._apiKey}"
+            # Strip any whitespace that might have been accidentally included
+            self._apiKey = self._apiKey.strip()
+            
+            # Grafana API keys can use different formats depending on version:
+            # 1. X-Grafana-API-Key: <key> (traditional format, most common)
+            # 2. Authorization: Bearer <key> (newer format for service account tokens)
+            # Use X-Grafana-API-Key as it's the most widely supported format
+            self.headers["X-Grafana-API-Key"] = self._apiKey
+            
+            # Don't use basic auth if API key is provided
+            if auth_user or auth_pass:
+                import warnings
+                warnings.warn("Both API key and basic auth provided. API key will be used, basic auth ignored.")
 
     @property
     def apiKey(self):
@@ -107,6 +119,8 @@ class GrafanaClient(object):
         self._results = requests.get(url, headers=self.headers, auth=self.auth)
         if self.results.status_code == requests.codes.ok:
             return self.results.json()
+        elif self.results.status_code == 401:
+            self._print_error()
         return None
 
     def post(self, url, data):
@@ -116,8 +130,39 @@ class GrafanaClient(object):
         if self.results.status_code == requests.codes.ok:
             return True
         else:
-            print(self.results.json())
+            self._print_error()
             return False
+    
+    def _print_error(self):
+        """Print detailed error information for debugging"""
+        status_code = self.results.status_code
+        print(f"Error: HTTP {status_code}")
+        try:
+            error_data = self.results.json()
+            if isinstance(error_data, dict):
+                if "message" in error_data:
+                    print(f"Message: {error_data['message']}")
+                print(f"Response: {json.dumps(error_data, indent=2)}")
+            else:
+                print(f"Response: {error_data}")
+        except Exception:
+            print(f"Response text: {self.results.text}")
+        
+        if status_code == 401:
+            print("\nAuthentication failed. Check:")
+            print("  - API key is correct and has Admin role")
+            print("  - API key format: Should be 'glsa_...' for service accounts")
+            print("  - API key hasn't expired")
+            print("  - If using basic auth, check username/password")
+            print(f"\nDebug info:")
+            print(f"  - Using API key: {'Yes' if self._apiKey else 'No'}")
+            if self._apiKey:
+                # Show first/last few chars for debugging without exposing full key
+                key_preview = f"{self._apiKey[:8]}...{self._apiKey[-4:]}" if len(self._apiKey) > 12 else "***"
+                print(f"  - API key preview: {key_preview}")
+                print(f"  - API key length: {len(self._apiKey)}")
+                print(f"  - Auth header: X-Grafana-API-Key")
+            print(f"  - Using basic auth: {'Yes' if (self._auth_user and self._auth_pass) else 'No'}")
 
     def put(self, url, data):
         self._results = requests.put(

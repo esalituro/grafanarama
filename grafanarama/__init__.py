@@ -3,6 +3,7 @@ from typing import Any
 from pydantic import model_serializer, field_validator, model_validator
 
 from .core.dashboard import Dashboard, Metadata, Spec, Status
+from .schema_utils import apply_schema_defaults, get_array_fields, get_nested_array_fields
 
 
 class DashboardObject(Dashboard):
@@ -69,5 +70,32 @@ class DashboardObject(Dashboard):
         return result
 
     @model_serializer()
-    def serialize_model(self) -> Spec:
-        return self.spec
+    def serialize_model(self) -> dict:
+        """Serialize to Grafana-compatible JSON format using schema-based defaults"""
+        spec_dict = self.spec.model_dump(mode='json', exclude_unset=False)
+        
+        # Use schema to automatically convert null arrays to empty arrays
+        spec_dict = apply_schema_defaults(spec_dict, Spec)
+        
+        # Handle special cases that Grafana requires but aren't in schema defaults
+        # Time field - required for dashboard initialization
+        if 'time' not in spec_dict or spec_dict['time'] is None:
+            spec_dict['time'] = {'from': 'now-6h', 'to': 'now'}
+        elif isinstance(spec_dict['time'], dict):
+            # Handle Pydantic alias: from_ -> from
+            if 'from_' in spec_dict['time'] and 'from' not in spec_dict['time']:
+                spec_dict['time']['from'] = spec_dict['time'].pop('from_')
+        
+        # Timepicker - can be empty object
+        if 'timepicker' not in spec_dict or spec_dict['timepicker'] is None:
+            spec_dict['timepicker'] = {}
+        
+        # Version - required for new dashboards
+        if 'version' not in spec_dict or spec_dict['version'] is None:
+            spec_dict['version'] = 1
+        
+        # WeekStart - Grafana expects empty string, not null
+        if 'weekStart' not in spec_dict or spec_dict['weekStart'] is None:
+            spec_dict['weekStart'] = ""
+        
+        return spec_dict

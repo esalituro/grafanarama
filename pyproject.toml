@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "grafanarama"
+version = "0.1.0"
+description = "A Python library to create Grafana Dashboards"
+authors = ["Eric Salituro <esalituro@icloud.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pydantic = "^2.6.4"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.1.1"
+black = "^24.3.0"
+tox = "^4.14.1"
+pytest-cov = "^4.1.0"
+setuptools = "^69.2.0"
+
+[tool.poetry.group.generate.dependencies]
+datamodel-code-generator = "^0.25.5"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

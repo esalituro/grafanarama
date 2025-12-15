@@ -27,6 +27,9 @@ vars:
 tasks:
   venv:run:
     desc: Run a command inside the venv
+    preconditions:
+      - test -d {{ .VENV }}
+      - test -f "{{ .VENV }}/bin/activate"
     cmds:
       - VIRTUAL_ENV={{.VENV}} PATH="{{.VENV}}/bin${PATH:+:${PATH}}" {{.CLI_ARGS}}
 
@@ -36,14 +39,17 @@ tasks:
       - task venv:run -- pip3 install {{.CLI_ARGS}} {{ .PACKAGE }}
 
   python3:run:
+    desc: Run a Python module inside the venv
     cmds:
       - task venv:run -- python3 -m {{ .MODULE }} {{ .CLI_ARGS }}
 
   tox:run:
+    desc: Run tox tests
     cmds:
       - task venv:run -- tox run
 
   install-xcode-cli:
+    desc: Install Xcode Command Line Tools (macOS only)
     status:
       - test -d /Library/Developer/CommandLineTools
       - test -f /Library/Developer/CommandLineTools/usr/bin/git
@@ -51,23 +57,40 @@ tasks:
       - xcode-select --install
 
   install-poetry:
+    desc: Install Poetry package manager
     deps:
       - install-venv
-      - update-pip3
-      - update-setuptools
+    preconditions:
+      - task venv:run -- which pip3
+      - task venv:run -- pip3 show setuptools
     status:
       - task venv:run -- which poetry
     cmds:
       - task: pip3:install
         vars: { PACKAGE: "poetry" }
 
+  poetry:install:
+    desc: Install dependencies from poetry.lock
+    deps:
+      - install-poetry
+    cmds:
+      - task venv:run -- poetry install
+
+  poetry:update:
+    desc: Update dependencies using Poetry
+    deps:
+      - install-poetry
+    cmds:
+      - task venv:run -- poetry update
+
   install-venv:
+    desc: Create Python virtual environment
     status:
       - test -d {{ .VENV }}
       - test -f "{{ .VENV }}/bin/activate"
     cmds:
       - task: python3:run
-        vars: { MODULE: "venv", CLI_ARGS: .VENV }
+        vars: { MODULE: "venv", CLI_ARGS: "{{ .VENV }}" }
 
   install-*:
     vars:
@@ -78,6 +101,7 @@ tasks:
       - task pip3:install -- {{ .CLI_ARGS }} {{ .PACKAGE }}
 
   update-pip3:
+    desc: Update pip to latest version
     preconditions:
       - task venv:run -- which pip3
     cmds:
@@ -94,12 +118,14 @@ tasks:
       - task pip3:install -- -U {{ .PACKAGE }}
 
   mkdirs-core:
+    desc: Create core directory structure
     status:
       - test -d grafanarama/core
     cmds:
       - mkdir -p grafanarama/core
 
   mkdirs-composable:
+    desc: Create composable directory structure
     status:
       - test -d grafanarama/composable/panelcfg
       - test -d grafanarama/composable/dataquery
@@ -108,6 +134,7 @@ tasks:
       - mkdir -p grafanarama/composable/dataquery
 
   init-core:
+    desc: Initialize core __init__.py files
     status:
       - test -f grafanarama/__init__.py
       - test -f grafanarama/core/__init__.py
@@ -116,6 +143,7 @@ tasks:
       - touch grafanarama/core/__init__.py
 
   init-composable:
+    desc: Initialize composable __init__.py files
     status:
       - test -f grafanarama/__init__.py
       - test -f grafanarama/composable/__init__.py
@@ -128,11 +156,13 @@ tasks:
       - touch grafanarama/composable/dataquery/__init__.py
   
   build-kinds:
+    desc: Build all code-generated kinds (core and composable)
     cmds:
       - task: build-core
       - task: build-composable
 
   build-core:
+    desc: Build core code-generated models
     deps: [mkdirs-core, init-core]
     vars:
       KIND: core
@@ -149,6 +179,7 @@ tasks:
         task: run-codegen-core
 
   build-composable:
+    desc: Build composable code-generated models
     deps: [mkdirs-composable, init-composable]
     vars:
       KIND: composable
@@ -227,3 +258,13 @@ tasks:
     cmds:
       - |
         echo "Grafana version: {{.GRAFANA_VERSION}}"
+
+  grafana:status:
+    desc: Show Grafana container status
+    cmds:
+      - docker compose ps grafana
+
+  grafana:shell:
+    desc: Open a shell in the Grafana container
+    cmds:
+      - docker compose exec grafana /bin/sh

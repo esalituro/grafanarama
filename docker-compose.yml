@@ -1,9 +1,10 @@
-version: '3'
-
 services:
   grafana:
-    image: "grafana/grafana:${TAG-latest}"
+    image: "grafana/grafana:${GRAFANA_VERSION:-latest}"
     ports:
-      - "3000:3000"
+      - "${GRAFANA_PORT:-3000}:3000"
     volumes:
-      - "${PWD-.}/grafana:/var/lib/grafana"
+      - "${PWD:-.}/grafana:/var/lib/grafana"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}

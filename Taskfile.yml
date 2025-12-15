@@ -11,21 +11,18 @@ vars:
   SRC_MODEL: jsonschema
   VERSION: 10.4.0
   VERSION_STRING: "v{{ .VERSION }}"
+  GRAFANA_VERSION: '{{ or (env "GRAFANA_VERSION") "12.3.0" }}'
   VENV: venv
   SCOPE: schemas
   INPUT_FILE_TYPE: auto
   OUTPUT_MODEL_TYPE: pydantic_v2.BaseModel
   GROK_REPO: '{{ joinPath .HOME "dev/grok" }}'
   GROK_SCHEMA_ROOT: "{{ joinPath .GROK_REPO .SRC_MODEL .VERSION_STRING }}"
-  GRAFANA_API_KEY: "{{ env "GRAFANA_API_KEY" }}"
-  GRAFANA_USER: "{{ env "GRAFANA_USER" }}"
-  GRAFANA_PASSWORD: "{{ env "GRAFANA_PASSWORD" }}"
-  GRAFANA_HOST: "{{ env "GRAFANA_HOST" }}"
-  GRAFANA_PORT: "{{ env "GRAFANA_PORT" }}"
-  GRAFANA_USE_HTTPS: "{{ env "GRAFANA_USE_HTTPS" }}"
-  GRAFANA_USE_BASIC_AUTH: "{{ env "GRAFANA_USE_BASIC_AUTH" }}"
-  GRAFANA_USE_API_KEY: "{{ env "GRAFANA_USE_API_KEY" }}"
-  GRAFANA_USE_BASIC_AUTH: "{{ env "GRAFANA_USE_BASIC_AUTH" }}"
+  GRAFANA_API_KEY: '{{ env "GRAFANA_API_KEY" }}'
+  GRAFANA_USER: '{{ env "GRAFANA_USER" }}'
+  GRAFANA_PASSWORD: '{{ env "GRAFANA_PASSWORD" }}'
+  GRAFANA_HOST: '{{ env "GRAFANA_HOST" }}'
+  GRAFANA_PORT: '{{ env "GRAFANA_PORT" }}'
   
 tasks:
   venv:run:
@@ -203,3 +200,30 @@ tasks:
       SUB: "{{ index .MATCH 0 }}"
     cmds:
       - task venv:run -- tox run -e {{ .SUB }}
+
+  grafana:up:
+    desc: Start Grafana server (uses GRAFANA_VERSION from Taskfile vars or env var)
+    cmds:
+      - GRAFANA_VERSION={{.GRAFANA_VERSION}} docker compose up -d
+
+  grafana:down:
+    desc: Stop Grafana server
+    cmds:
+      - docker compose down
+
+  grafana:logs:
+    desc: Show Grafana server logs
+    cmds:
+      - docker compose logs -f grafana
+
+  grafana:restart:
+    desc: Restart Grafana server with optional version update
+    cmds:
+      - task: grafana:down
+      - task: grafana:up
+
+  grafana:version:
+    desc: Show current Grafana version
+    cmds:
+      - |
+        echo "Grafana version: {{.GRAFANA_VERSION}}"

@@ -20,3 +20,4 @@ dist/
 *.json.bak
 .env
 .env.local
+grafana/
